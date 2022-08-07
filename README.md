@@ -22,8 +22,8 @@ I just add GUI for [`shutil.copy2`](https://docs.python.org/3/library/shutil.htm
 Benchmark: 40 .jpg + 40 .nef (1.52 GB, 1,636,901,294 Bytes) from NAS to NAS locally
 
 + Copy by ctrl-c ctrl-v: 19s (just copy without file comparison)
-+ Copy by excp: 49s
-+ Copy by excp with `asyncio` and `concurrent.futures`: 43s
++ Copy by excp: 49s (shutil.copy2 is slow)
++ Copy by excp with `asyncio` and `concurrent.futures`: 43s (deprecated because of non-significant improvement)
 ## Disclaimer
 
 While the author uses excp to copy the files from his camera to the PC, you should not rely on this program for your important data. The author is not responsible for any damage to the data.

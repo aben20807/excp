@@ -1,4 +1,3 @@
-import asyncio
 import tkinter as tk
 from tkinter import filedialog
 from alive_progress import alive_bar
@@ -6,7 +5,6 @@ import shutil
 import filecmp
 import os, sys
 import configparser
-import concurrent.futures
 
 
 root = tk.Tk()
@@ -15,10 +13,9 @@ root.withdraw()
 # default configuration for generation first time
 CONFIG = {
     "Settings": {
-        "overwrite": True,
+        "overwrite": False,
         "retry_max": 3,
         "close_after_done": False,
-        "thread_num": 8,
     }
 }
 
@@ -41,7 +38,6 @@ def read_config():
     CONFIG["Settings"]["close_after_done"] = config.getboolean(
         "Settings", "close_after_done"
     )
-    CONFIG["Settings"]["thread_num"] = config.getint("Settings", "thread_num")
 
 
 def gen_config():
@@ -62,15 +58,14 @@ def open_dialogs():
     return file_paths, dirname
 
 
-def copy_task(file_paths, dirname, idx):
+def copy_task(file_paths, dirname):
     retry_cnt = 0
     it = iter(file_paths)
     src_path, at_end = next(it, ""), object()
     with alive_bar(
-        len(file_paths) * CONFIG["Settings"]["thread_num"],
+        len(file_paths),
         dual_line=True,
         title="Copying...",
-        disable=(True if idx != 0 else False),
     ) as update:
         while src_path is not at_end:
             try:
@@ -87,12 +82,11 @@ def copy_task(file_paths, dirname, idx):
                             f"Files `{src_path}`, `{dst_path}` not the same"
                         )
                 else:
-                    print(f"File `{dst_path}` exists")
+                    print(f"File `{dst_path}` exists, not copy")
 
                 # Reset the retry_cnt before go to the next
                 retry_cnt = 0
-                for _ in range(CONFIG["Settings"]["thread_num"]):
-                    update()
+                update()
                 src_path = next(it, at_end)
 
             except FileNotSameException as e:
@@ -111,19 +105,13 @@ def copy_task(file_paths, dirname, idx):
                         os.remove(dst_path)
                     # Reset the retry_cnt before go to the next
                     retry_cnt = 0
-                    for _ in range(CONFIG["Settings"]["thread_num"]):
-                        update()
+                    update()
                     src_path = next(it, at_end)
                     continue
                 continue
 
 
-def split_tasks(tasks, n):
-    for i in range(0, len(tasks), n):
-        yield tasks[i : i + n]
-
-
-async def main(executor):
+def main():
     file_paths, dirname = open_dialogs()
 
     if len(file_paths) == 0 or dirname == "":
@@ -132,14 +120,8 @@ async def main(executor):
         print("do nothing...")
         return
 
-    loop = asyncio.get_event_loop()
-    tasks = [
-        loop.run_in_executor(executor, copy_task, file_paths_sep, dirname, idx)
-        for idx, file_paths_sep in enumerate(
-            split_tasks(file_paths, len(file_paths) // CONFIG["Settings"]["thread_num"])
-        )
-    ]
-    await asyncio.wait(tasks)
+    print(f"Total {len(file_paths)} files")
+    copy_task(file_paths, dirname)
 
 
 if __name__ == "__main__":
@@ -150,17 +132,8 @@ if __name__ == "__main__":
 
     print(f"Config: {CONFIG}")
 
-    executor = concurrent.futures.ThreadPoolExecutor(
-        max_workers=CONFIG["Settings"]["thread_num"],
-    )
-
     print("Start copying...")
-    event_loop = asyncio.get_event_loop()
-    try:
-        event_loop.run_until_complete(main(executor))
-    finally:
-        event_loop.close()
-
+    main()
     print("Finish copying...")
     if not CONFIG["Settings"]["close_after_done"]:
         input("Press enter to exit")
