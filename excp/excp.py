@@ -10,6 +10,7 @@ import configparser
 root = tk.Tk()
 root.withdraw()
 
+# default configuration for generation first time
 CONFIG = {"Settings": {"overwrite": True, "retry_max": 3, "close_after_done": False}}
 
 
@@ -19,7 +20,7 @@ def get_config_path():
         app_path = os.path.dirname(sys.executable)
     elif __file__:
         app_path = os.path.dirname(__file__)
-    config_path = os.path.join(app_path, "config.ini")
+    config_path = os.path.join(app_path, "excp_config.ini")
     return config_path
 
 
@@ -44,17 +45,17 @@ class FileNotSameException(Exception):
     pass
 
 
-class ReachRetryMaxException(Exception):
-    pass
-
-
 def main():
 
+    # Get file paths and target directory from dialog gui
     file_paths = filedialog.askopenfilenames(parent=root, title="Choose a file")
-    # print(root.tk.splitlist(file_paths))
-
     dirname = filedialog.askdirectory(parent=root, title="Choose a file")
-    # print(root.tk.splitlist(dirname))
+
+    if len(file_paths) == 0 or dirname == "":
+        print(f"Files: {root.tk.splitlist(file_paths)}")
+        print(f"Dir: {root.tk.splitlist(dirname)}")
+        print("do nothing...")
+        return
 
     retry_cnt = 0
     it = iter(file_paths)
@@ -66,6 +67,7 @@ def main():
                 # If the target file is existing and overwrite is not allowed,
                 # just show the message rather than copy the file
                 if not os.path.exists(dst_path) or CONFIG["Settings"]["overwrite"]:
+                    # Use copy2 to copy as more metadata as possible
                     shutil.copy2(src_path, dirname)
                     # Compare the file after it is copied
                     # If something different raise exception and retry
@@ -83,13 +85,23 @@ def main():
 
             except FileNotSameException as e:
                 print(f"{e}. Retry...")
+                # Delete the file to retry the copy
                 if os.path.exists(dst_path):
                     os.remove(dst_path)
                 retry_cnt += 1
                 if retry_cnt >= CONFIG["Settings"]["retry_max"]:
-                    raise ReachRetryMaxException(
+                    # if still have error, skip this file and go throught the next one
+                    print(
                         f"Reach maximum retries ({CONFIG['Settings']['retry_max']}) for {e}"
                     )
+                    # Delete the broken file
+                    if os.path.exists(dst_path):
+                        os.remove(dst_path)
+                    # Reset the retry_cnt before go to the next
+                    retry_cnt = 0
+                    update()
+                    src_path = next(it, at_end)
+                    continue
                 continue
 
 
@@ -99,12 +111,8 @@ if __name__ == "__main__":
     else:
         gen_config()
 
-    try:
-        print("Start copying...")
-        main()
-        print("Finish copying...")
-        if not CONFIG["Settings"]["close_after_done"]:
-            input("Press any key to leave")
-    except Exception as e:
-        print(e)
-        sys.exit(1)
+    print("Start copying...")
+    main()
+    print("Finish copying...")
+    if not CONFIG["Settings"]["close_after_done"]:
+        input("Press enter to exit")
