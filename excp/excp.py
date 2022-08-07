@@ -6,6 +6,7 @@ import shutil
 import filecmp
 import os, sys
 import configparser
+import concurrent.futures
 
 
 root = tk.Tk()
@@ -17,7 +18,7 @@ CONFIG = {
         "overwrite": True,
         "retry_max": 3,
         "close_after_done": False,
-        "task_size": 10,
+        "thread_num": 8,
     }
 }
 
@@ -40,7 +41,7 @@ def read_config():
     CONFIG["Settings"]["close_after_done"] = config.getboolean(
         "Settings", "close_after_done"
     )
-    CONFIG["Settings"]["task_size"] = config.getint("Settings", "task_size")
+    CONFIG["Settings"]["thread_num"] = config.getint("Settings", "thread_num")
 
 
 def gen_config():
@@ -66,7 +67,7 @@ def copy_task(file_paths, dirname, idx):
     it = iter(file_paths)
     src_path, at_end = next(it, ""), object()
     with alive_bar(
-        len(file_paths) * CONFIG["Settings"]["task_size"],
+        len(file_paths) * CONFIG["Settings"]["thread_num"],
         dual_line=True,
         title="Copying...",
         disable=(True if idx != 0 else False),
@@ -90,7 +91,7 @@ def copy_task(file_paths, dirname, idx):
 
                 # Reset the retry_cnt before go to the next
                 retry_cnt = 0
-                for _ in range(CONFIG["Settings"]["task_size"]):
+                for _ in range(CONFIG["Settings"]["thread_num"]):
                     update()
                 src_path = next(it, at_end)
 
@@ -110,7 +111,7 @@ def copy_task(file_paths, dirname, idx):
                         os.remove(dst_path)
                     # Reset the retry_cnt before go to the next
                     retry_cnt = 0
-                    for _ in range(CONFIG["Settings"]["task_size"]):
+                    for _ in range(CONFIG["Settings"]["thread_num"]):
                         update()
                     src_path = next(it, at_end)
                     continue
@@ -122,7 +123,7 @@ def split_tasks(tasks, n):
         yield tasks[i : i + n]
 
 
-async def main():
+async def main(executor):
     file_paths, dirname = open_dialogs()
 
     if len(file_paths) == 0 or dirname == "":
@@ -131,13 +132,14 @@ async def main():
         print("do nothing...")
         return
 
+    loop = asyncio.get_event_loop()
     tasks = [
-        asyncio.to_thread(copy_task, file_paths_sep, dirname, idx)
+        loop.run_in_executor(executor, copy_task, file_paths_sep, dirname, idx)
         for idx, file_paths_sep in enumerate(
-            split_tasks(file_paths, CONFIG["Settings"]["task_size"])
+            split_tasks(file_paths, len(file_paths) // CONFIG["Settings"]["thread_num"])
         )
     ]
-    await asyncio.gather(*tasks)
+    await asyncio.wait(tasks)
 
 
 if __name__ == "__main__":
@@ -146,8 +148,19 @@ if __name__ == "__main__":
     else:
         gen_config()
 
+    print(f"Config: {CONFIG}")
+
+    executor = concurrent.futures.ThreadPoolExecutor(
+        max_workers=CONFIG["Settings"]["thread_num"],
+    )
+
     print("Start copying...")
-    asyncio.run(main())
+    event_loop = asyncio.get_event_loop()
+    try:
+        event_loop.run_until_complete(main(executor))
+    finally:
+        event_loop.close()
+
     print("Finish copying...")
     if not CONFIG["Settings"]["close_after_done"]:
         input("Press enter to exit")
