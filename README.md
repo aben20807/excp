@@ -4,6 +4,8 @@ Copy files with comparison checks.
 
 I just add GUI for [`shutil.copy2`](https://docs.python.org/3/library/shutil.html?highlight=shutil%20copy2#shutil.copy2) and [`filecmp.cmp`](https://docs.python.org/3/library/filecmp.html?highlight=filecmp%20cmp#filecmp.cmp).
 
+Download the pre-build binary for win10 from the [release](https://github.com/aben20807/excp/releases).
+
 ## Demo
 
 ![excp](https://user-images.githubusercontent.com/14831545/183351047-c1d2ec44-4575-4663-a8da-2898b33fffd6.gif)
@@ -34,7 +36,7 @@ While the author uses excp to copy the files from his camera to the PC, you shou
 
 ## Icon credit
 
-+ The [icon (excp.ico)](https://icon-icons.com/icon/copy-paste-move-square/67897) is from [Kirill Kazachek](https://www.behance.net/kazachek) who shares it under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
+The [icon (excp.ico)](https://icon-icons.com/icon/copy-paste-move-square/67897) is from [Kirill Kazachek](https://www.behance.net/kazachek) who shares it under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
 
 ## License
 
